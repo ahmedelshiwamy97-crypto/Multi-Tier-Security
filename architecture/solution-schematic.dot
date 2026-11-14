@@ -1,0 +1,37 @@
+digraph SecureBanking {
+  graph [rankdir=TB, bgcolor="#f8fafc", pad="0.35", nodesep="0.35", ranksep="0.55", splines=ortho, fontname="Arial", fontsize=20, labelloc=t, label="Secure Multi-Tier Banking Application | AWS us-east-1"];
+  node [shape=box, style="rounded,filled", fontname="Arial", fontsize=10, margin="0.16,0.10", color="#64748b", penwidth=1.3];
+  edge [fontname="Arial", fontsize=9, color="#475569", penwidth=1.4, arrowsize=0.8];
+  users [label="Internet users", shape=oval, fillcolor="#e0f2fe"];
+  igw [label="Internet Gateway", fillcolor="#f3e8ff"];
+  alb [label="Application Load Balancer\nPublic subnets | HTTP :80", fillcolor="#ffedd5"];
+  nat [label="NAT Gateway\nOutbound access (single NAT lab design)", fillcolor="#ffedd5"];
+  subgraph cluster_vpc {
+    label="VPC 10.0.0.0/16"; color="#2563eb"; style="rounded"; penwidth=2;
+    subgraph cluster_public { label="Public subnets • 2 AZs"; color="#f59e0b"; style="rounded,dashed"; alb; nat; }
+    subgraph cluster_app { label="Private application subnets"; color="#2563eb"; style="rounded,dashed";
+      ec2 [label="Amazon EC2 • 10.0.11.90\nFlask + Gunicorn • TCP :5000\nSSM managed • no public IP", fillcolor="#dbeafe"];
+    }
+    subgraph cluster_db { label="Private database subnets"; color="#16a34a"; style="rounded,dashed";
+      rds [label="Amazon RDS for MySQL 8.4\nbanking_db • TCP :3306\nSingle-AZ lab deployment", shape=cylinder, fillcolor="#dcfce7"];
+    }
+    igw -> alb;
+    alb -> ec2 [label="Target group :5000"];
+    ec2 -> rds [label="MySQL :3306"];
+    ec2 -> nat [style=dashed, label="Outbound updates"];
+  }
+  users -> igw [label="HTTP request"];
+  secrets [label="Secrets Manager\nApplication DB secret", fillcolor="#fce7f3"];
+  iam [label="EC2 IAM role\nGetSecretValue on app secret only", fillcolor="#dbeafe"];
+  kms [label="AWS KMS CMK\nRDS encryption at rest", fillcolor="#f3e8ff"];
+  ct [label="CloudTrail\nMulti-region trail", fillcolor="#e0e7ff"];
+  s3 [label="S3 audit bucket\nSSE-S3 • Block Public Access", shape=cylinder, fillcolor="#fef9c3"];
+  gd [label="GuardDuty • NOT ENABLED", style="rounded,dashed,filled", fillcolor="#fee2e2"];
+  sh [label="Security Hub • NOT VERIFIED", style="rounded,dashed,filled", fillcolor="#fee2e2"];
+  ir [label="EventBridge + Lambda • NOT DEPLOYED", style="rounded,dashed,filled", fillcolor="#f1f5f9"];
+  ec2 -> secrets [label="Retrieve app secret"];
+  iam -> ec2 [style=dashed, label="Instance profile"];
+  kms -> rds [style=dashed, label="Encryption"];
+  ct -> s3 [label="Audit logs"];
+  gd -> ir [style=dashed]; sh -> ir [style=dashed];
+}

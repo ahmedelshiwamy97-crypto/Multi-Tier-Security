@@ -1,0 +1,25 @@
+flowchart TB
+  U((Internet users)) -->|HTTP :80| ALB
+  subgraph VPC["Amazon VPC • Secure-MultiTier-VPC • 10.0.0.0/16"]
+    IGW["Internet Gateway"]
+    subgraph PUB["Public subnets • 2 AZs"]
+      ALB["Application Load Balancer<br/>Listener HTTP :80"]
+      NAT["NAT Gateway<br/>Outbound app-tier access"]
+    end
+    subgraph APP["Private application subnets"]
+      EC2["Amazon EC2 • 10.0.11.90<br/>Flask + Gunicorn • TCP :5000<br/>SSM managed • no public IP"]
+    end
+    subgraph DATA["Private database subnets"]
+      RDS[("Amazon RDS for MySQL 8.4<br/>banking_db • TCP :3306<br/>Single-AZ lab deployment")]
+    end
+    IGW --> ALB
+    ALB -->|"Target group :5000"| EC2
+    EC2 -->|"MySQL :3306"| RDS
+    EC2 -. outbound updates .-> NAT
+  end
+  EC2 -->|"GetSecretValue"| SM["AWS Secrets Manager<br/>Application DB secret"]
+  IAM["EC2 IAM role<br/>Least privilege"] -.-> EC2
+  KMS["AWS KMS CMK"] -. encrypts at rest .-> RDS
+  CT["AWS CloudTrail<br/>Multi-region trail"] --> S3[("Private S3 audit bucket<br/>SSE-S3 • Block Public Access")]
+  GD["GuardDuty • NOT ENABLED"] -. pending .-> IR["EventBridge + Lambda<br/>NOT DEPLOYED"]
+  SH["Security Hub • NOT VERIFIED"] -. pending .-> IR
